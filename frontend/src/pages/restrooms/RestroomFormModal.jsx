@@ -5,6 +5,7 @@ import Field from '../../components/Field.jsx';
 import Modal from '../../components/Modal.jsx';
 import { useDictionaries } from '../../hooks/useDictionaries.js';
 import { useToast } from '../../components/Toast.jsx';
+import { estimateCycleDays } from '../../utils/format.js';
 
 const EMPTY = {
   name: '',
@@ -17,6 +18,9 @@ const EMPTY = {
   open_hours: '06:00-22:00',
   stall_count: 0,
   basin_count: 0,
+  septic_capacity: 5,
+  usage_frequency: '中频',
+  septic_cycle_days: '',
   has_accessible: true,
   remark: '',
 };
@@ -24,12 +28,20 @@ const EMPTY = {
 export default function RestroomFormModal({ restroom, onClose, onSaved }) {
   const { dictionaries } = useDictionaries();
   const toast = useToast();
-  const [form, setForm] = useState(() => ({ ...EMPTY, ...(restroom ?? {}) }));
+  const [form, setForm] = useState(() => ({
+    ...EMPTY,
+    ...(restroom ?? {}),
+    septic_cycle_days: restroom?.septic_cycle_days ?? '',
+  }));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
   const setValue = (key) => (event) => {
     const target = event.target;
+    if (key === 'septic_cycle_days') {
+      setForm((prev) => ({ ...prev, [key]: target.value === '' ? '' : Number(target.value) }));
+      return;
+    }
     const value =
       target.type === 'checkbox'
         ? target.checked
@@ -47,7 +59,10 @@ export default function RestroomFormModal({ restroom, onClose, onSaved }) {
     }
     setSaving(true);
     setError(null);
-    const payload = { ...form };
+    const payload = {
+      ...form,
+      septic_cycle_days: form.septic_cycle_days === '' ? null : form.septic_cycle_days,
+    };
     delete payload.id;
     delete payload.code;
     delete payload.created_at;
@@ -129,6 +144,42 @@ export default function RestroomFormModal({ restroom, onClose, onSaved }) {
         </Field>
         <Field label="洗手盆数量">
           <input type="number" min="0" value={form.basin_count} onChange={setValue('basin_count')} />
+        </Field>
+        <Field label="化粪池容积（m³）" hint="用于推算清掏周期">
+          <input
+            type="number"
+            min="0.1"
+            step="0.1"
+            value={form.septic_capacity}
+            onChange={setValue('septic_capacity')}
+          />
+        </Field>
+        <Field label="使用频次" hint="反映日均人流量">
+          <select value={form.usage_frequency} onChange={setValue('usage_frequency')}>
+            {(dictionaries?.usage_frequency || ['低频', '中频', '高频']).map((item) => (
+              <option key={item}>{item}</option>
+            ))}
+          </select>
+        </Field>
+        <Field
+          label="清掏周期（天）"
+          hint={
+            form.septic_cycle_days
+              ? `已人工指定周期 ${form.septic_cycle_days} 天`
+              : `留空则按池容/频次推算：约 ${estimateCycleDays(
+                  form.septic_capacity,
+                  form.usage_frequency,
+                )} 天/次`
+          }
+        >
+          <input
+            type="number"
+            min="1"
+            max="3650"
+            value={form.septic_cycle_days}
+            placeholder="留空自动推算"
+            onChange={setValue('septic_cycle_days')}
+          />
         </Field>
         <Field label="无障碍设施" full>
           <label className="checkbox-row">

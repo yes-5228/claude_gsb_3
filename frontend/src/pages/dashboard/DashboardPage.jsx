@@ -13,6 +13,7 @@ import {
   RankingPanel,
   RecentInspectionsPanel,
   RecentIssuesPanel,
+  SepticAlertPanel,
 } from './DashboardPanels.jsx';
 
 const RANGE_OPTIONS = [7, 14, 30];
@@ -93,6 +94,14 @@ export default function DashboardPage() {
                 foot={`本月完成 ${overview.issue_done_this_month} 条`}
               />
             </div>
+
+            {data.septic_alerts?.length ? (
+              <SepticAlertPanel
+                items={data.septic_alerts}
+                overdueCount={data.septic_overview?.overdue_count}
+                dueSoonCount={data.septic_overview?.due_soon_count}
+              />
+            ) : null}
 
             <div className="grid-2">
               <section className="card">

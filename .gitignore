@@ -41,4 +41,5 @@ traces/
 
 db.sqlite3
 *.sqlite3
+backend/data/
 .venv

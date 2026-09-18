@@ -7,8 +7,9 @@ from sqlalchemy.orm import Session
 
 from app.core.constants import OPEN_ISSUE_STATUSES
 from app.core.exceptions import ConflictError, DomainError, NotFoundError
-from app.models import Inspection, Issue, Restroom
+from app.models import Inspection, Issue, Restroom, SepticCleaning
 from app.schemas.restroom import RestroomCreate, RestroomDetail, RestroomOut, RestroomUpdate
+from app.services import septic_service
 
 SORTABLE_FIELDS = {
     "code": Restroom.code,
@@ -107,10 +108,13 @@ def delete_restroom(db: Session, restroom_id: int, *, force: bool = False) -> No
     issue_count = db.scalar(
         select(func.count()).select_from(Issue).where(Issue.restroom_id == restroom_id)
     ) or 0
-    if (inspection_count or issue_count) and not force:
+    cleaning_count = db.scalar(
+        select(func.count()).select_from(SepticCleaning).where(SepticCleaning.restroom_id == restroom_id)
+    ) or 0
+    if (inspection_count or issue_count or cleaning_count) and not force:
         raise ConflictError(
-            f"该公厕已有 {inspection_count} 条巡查记录、{issue_count} 条问题记录，"
-            "确需删除请使用 force=true"
+            f"该公厕已有 {inspection_count} 条巡查记录、{issue_count} 条问题记录、"
+            f"{cleaning_count} 条清掏记录，确需删除请使用 force=true"
         )
     db.delete(restroom)
     db.commit()
@@ -148,6 +152,7 @@ def get_restroom_detail(db: Session, restroom_id: int) -> RestroomDetail:
         avg_score=round(float(avg_score), 1) if avg_score is not None else None,
         open_issue_count=open_issue_count,
         total_issue_count=total_issue_count,
+        **septic_service.restroom_septic_summary(db, restroom),
     )
 
 

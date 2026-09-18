@@ -819,6 +819,16 @@ table.data-table td.wrap {
   color: var(--text-muted);
 }
 
+.text-danger {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.text-warning {
+  color: var(--warning);
+  font-weight: 600;
+}
+
 .inline {
   display: flex;
   align-items: center;

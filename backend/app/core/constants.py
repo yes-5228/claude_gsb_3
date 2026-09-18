@@ -21,6 +21,34 @@ class Shift(StrEnum):
     NIGHT = "晚班"
 
 
+class UsageFrequency(StrEnum):
+    LOW = "低频"
+    MEDIUM = "中频"
+    HIGH = "高频"
+
+
+# 不同使用频次对应的日均污物负荷系数（人·吨/立方米的相对值）
+USAGE_LOAD_FACTORS: dict[str, float] = {
+    UsageFrequency.LOW: 0.6,
+    UsageFrequency.MEDIUM: 1.0,
+    UsageFrequency.HIGH: 1.6,
+}
+
+# 清掏周期推算：周期(天) = 池容 × 系数 / 负荷系数，再夹取到上下限区间
+SEPTIC_CYCLE_CAPACITY_FACTOR = 18.0
+SEPTIC_CYCLE_MIN_DAYS = 15
+SEPTIC_CYCLE_MAX_DAYS = 180
+
+# 到期前提前提醒的天数
+SEPTIC_REMIND_BEFORE_DAYS = 7
+
+# 清掏计划状态
+SEPTIC_STATUS_NORMAL = "正常"
+SEPTIC_STATUS_DUE_SOON = "即将到期"
+SEPTIC_STATUS_OVERDUE = "已超期"
+SEPTIC_STATUS_UNKNOWN = "未建档"
+
+
 class InspectionResult(StrEnum):
     NORMAL = "正常"
     ABNORMAL = "发现问题"

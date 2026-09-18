@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 
 from app.core.constants import (
     OPEN_ISSUE_STATUSES,
+    SEPTIC_STATUS_DUE_SOON,
+    SEPTIC_STATUS_OVERDUE,
     IssueCategory,
     IssueSeverity,
     IssueStatus,
@@ -22,7 +24,7 @@ from app.schemas.stats import (
     RestroomRankItem,
     TrendPoint,
 )
-from app.services import inspection_service, issue_service
+from app.services import inspection_service, issue_service, septic_service
 
 
 def _count(db: Session, model, *conditions) -> int:
@@ -232,6 +234,11 @@ def dashboard(db: Session, trend_days: int = 14) -> DashboardStats:
     recent_inspections, _ = inspection_service.list_inspections(
         db, page=1, page_size=5, sort_by="inspect_time"
     )
+    septic_alerts = [
+        item
+        for item in septic_service.list_schedules(db)
+        if item.status in (SEPTIC_STATUS_OVERDUE, SEPTIC_STATUS_DUE_SOON)
+    ]
     return DashboardStats(
         overview=overview(db),
         issue_by_status=issue_by_status(db),
@@ -242,4 +249,6 @@ def dashboard(db: Session, trend_days: int = 14) -> DashboardStats:
         top_restrooms=restroom_ranking(db),
         recent_issues=[issue_service.to_out(issue) for issue in recent_issues],
         recent_inspections=[inspection_service.to_out(item) for item in recent_inspections],
+        septic_overview=septic_service.overview(db),
+        septic_alerts=septic_alerts,
     )

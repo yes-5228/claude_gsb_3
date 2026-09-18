@@ -10,12 +10,18 @@ from app.core.constants import (
     INSPECTION_CHECK_ITEMS,
     INSPECTION_ITEM_MAX_SCORE,
     ISSUE_TRANSITIONS,
+    SEPTIC_REMIND_BEFORE_DAYS,
+    SEPTIC_STATUS_DUE_SOON,
+    SEPTIC_STATUS_NORMAL,
+    SEPTIC_STATUS_OVERDUE,
+    SEPTIC_STATUS_UNKNOWN,
     IssueCategory,
     IssueSeverity,
     IssueStatus,
     RestroomGrade,
     RestroomStatus,
     Shift,
+    UsageFrequency,
 )
 from app.core.database import get_db
 from app.services import inspection_service
@@ -33,6 +39,7 @@ class RestroomOption(BaseModel):
 class Dictionaries(BaseModel):
     restroom_status: list[str]
     restroom_grade: list[str]
+    usage_frequency: list[str]
     shift: list[str]
     issue_category: list[str]
     issue_severity: list[str]
@@ -40,6 +47,8 @@ class Dictionaries(BaseModel):
     inspection_check_items: list[str]
     inspection_item_max_score: int
     issue_transitions: dict[str, list[str]]
+    septic_status: list[str]
+    septic_remind_before_days: int
 
 
 @router.get("/dictionaries", response_model=Dictionaries, summary="枚举字典")
@@ -47,6 +56,7 @@ def get_dictionaries() -> Dictionaries:
     return Dictionaries(
         restroom_status=[item.value for item in RestroomStatus],
         restroom_grade=[item.value for item in RestroomGrade],
+        usage_frequency=[item.value for item in UsageFrequency],
         shift=[item.value for item in Shift],
         issue_category=[item.value for item in IssueCategory],
         issue_severity=[item.value for item in IssueSeverity],
@@ -54,6 +64,13 @@ def get_dictionaries() -> Dictionaries:
         inspection_check_items=list(INSPECTION_CHECK_ITEMS),
         inspection_item_max_score=INSPECTION_ITEM_MAX_SCORE,
         issue_transitions={key: list(value) for key, value in ISSUE_TRANSITIONS.items()},
+        septic_status=[
+            SEPTIC_STATUS_OVERDUE,
+            SEPTIC_STATUS_DUE_SOON,
+            SEPTIC_STATUS_NORMAL,
+            SEPTIC_STATUS_UNKNOWN,
+        ],
+        septic_remind_before_days=SEPTIC_REMIND_BEFORE_DAYS,
     )
 
 

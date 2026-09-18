@@ -2,8 +2,8 @@ import { Link } from 'react-router-dom';
 
 import BarList from '../../components/BarList.jsx';
 import DataTable from '../../components/DataTable.jsx';
-import { ScorePill, SeverityTag, StatusTag } from '../../components/Tags.jsx';
-import { formatDateTime } from '../../utils/format.js';
+import { ScorePill, SepticStatusTag, SeverityTag, StatusTag } from '../../components/Tags.jsx';
+import { formatDate, formatDateTime } from '../../utils/format.js';
 
 const STATUS_COLORS = {
   待整改: '#dc2626',
@@ -169,6 +169,62 @@ export function RecentInspectionsPanel({ items }) {
         ]}
         rows={items || []}
         emptyText="暂无巡查记录"
+      />
+    </section>
+  );
+}
+
+export function SepticAlertPanel({ items, overdueCount, dueSoonCount }) {
+  const rows = items || [];
+  return (
+    <section className="card">
+      <div className="card-title">
+        <h3>化粪池清掏到期预警</h3>
+        <span className="hint">
+          超期 {overdueCount ?? rows.filter((r) => r.status === '已超期').length} 座 · 即将到期{' '}
+          {dueSoonCount ?? rows.filter((r) => r.status === '即将到期').length} 座
+          <Link to="/septic" style={{ marginLeft: 10 }}>
+            前往清掏台账 →
+          </Link>
+        </span>
+      </div>
+      <DataTable
+        columns={[
+          {
+            key: 'name',
+            title: '公厕',
+            render: (row) => <Link to={`/restrooms/${row.restroom.id}`}>{row.restroom.name}</Link>,
+          },
+          { key: 'district', title: '区域', render: (row) => row.restroom.district },
+          {
+            key: 'cycle',
+            title: '周期/上次',
+            render: (row) => (
+              <span>
+                {row.cycle_days} 天 · {formatDate(row.latest_clean_date)}
+              </span>
+            ),
+          },
+          {
+            key: 'next',
+            title: '下次清掏',
+            render: (row) => formatDate(row.next_clean_date),
+          },
+          {
+            key: 'days_remaining',
+            title: '剩余',
+            render: (row) =>
+              row.days_remaining < 0 ? (
+                <span className="text-danger">超 {-row.days_remaining} 天</span>
+              ) : (
+                <span className="text-warning">剩 {row.days_remaining} 天</span>
+              ),
+          },
+          { key: 'status', title: '状态', render: (row) => <SepticStatusTag status={row.status} /> },
+        ]}
+        rows={rows}
+        rowKey={(row) => row.restroom.id}
+        emptyText="暂无到期或超期预警"
       />
     </section>
   );

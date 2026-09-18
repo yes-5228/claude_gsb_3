@@ -51,12 +51,32 @@ export const SEVERITY_TONES = {
   紧急: 'tag-danger',
 };
 
+export const SEPTIC_STATUS_TONES = {
+  已超期: 'tag-danger',
+  即将到期: 'tag-warning',
+  正常: 'tag-success',
+  未建档: 'tag-neutral',
+};
+
 export function statusTone(status) {
   return STATUS_TONES[status] || 'tag-neutral';
 }
 
 export function severityTone(severity) {
   return SEVERITY_TONES[severity] || 'tag-neutral';
+}
+
+export function septicStatusTone(status) {
+  return SEPTIC_STATUS_TONES[status] || 'tag-neutral';
+}
+
+/** 清掏周期推算，与后端 constants 保持一致：池容 × 18 / 频次系数，夹取 15-180 天。 */
+export function estimateCycleDays(septicCapacity, usageFrequency, manualCycle) {
+  if (manualCycle) return Number(manualCycle);
+  const loadFactors = { 低频: 0.6, 中频: 1.0, 高频: 1.6 };
+  const load = loadFactors[usageFrequency] ?? 1.0;
+  const raw = ((Number(septicCapacity) || 0) * 18) / load;
+  return Math.max(15, Math.min(180, Math.round(raw)));
 }
 
 export function scoreTone(score) {

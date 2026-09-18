@@ -1,4 +1,4 @@
-import { isOverdue, scoreTone, severityTone, statusTone } from '../utils/format.js';
+import { isOverdue, scoreTone, septicStatusTone, severityTone, statusTone } from '../utils/format.js';
 
 export function StatusTag({ status }) {
   return <span className={`tag ${statusTone(status)}`}>{status}</span>;
@@ -27,4 +27,8 @@ export function GradeTag({ grade }) {
           ? 'tag-warning'
           : 'tag-danger';
   return <span className={`tag ${tone}`}>{grade || '未评级'}</span>;
+}
+
+export function SepticStatusTag({ status }) {
+  return <span className={`tag ${septicStatusTone(status)}`}>{status}</span>;
 }

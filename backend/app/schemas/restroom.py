@@ -1,10 +1,10 @@
 """公厕台账相关数据结构。"""
 
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.core.constants import RestroomGrade, RestroomStatus
+from app.core.constants import RestroomGrade, RestroomStatus, UsageFrequency
 
 
 class RestroomBrief(BaseModel):
@@ -30,6 +30,13 @@ class RestroomBase(BaseModel):
     open_hours: str = Field(default="06:00-22:00", max_length=60, description="开放时间")
     stall_count: int = Field(default=0, ge=0, description="蹲位数量")
     basin_count: int = Field(default=0, ge=0, description="洗手盆数量")
+    septic_capacity: float = Field(default=5.0, gt=0, le=1000, description="化粪池容积（立方米）")
+    usage_frequency: UsageFrequency = Field(
+        default=UsageFrequency.MEDIUM, description="使用频次"
+    )
+    septic_cycle_days: int | None = Field(
+        default=None, ge=1, le=3650, description="清掏周期（天），留空按池容与使用频次推算"
+    )
     has_accessible: bool = Field(default=True, description="是否有无障碍设施")
     longitude: float | None = Field(default=None, description="经度")
     latitude: float | None = Field(default=None, description="纬度")
@@ -53,6 +60,9 @@ class RestroomUpdate(BaseModel):
     open_hours: str | None = Field(default=None, max_length=60)
     stall_count: int | None = Field(default=None, ge=0)
     basin_count: int | None = Field(default=None, ge=0)
+    septic_capacity: float | None = Field(default=None, gt=0, le=1000)
+    usage_frequency: UsageFrequency | None = None
+    septic_cycle_days: int | None = Field(default=None, ge=1, le=3650)
     has_accessible: bool | None = None
     longitude: float | None = None
     latitude: float | None = None
@@ -77,3 +87,7 @@ class RestroomDetail(RestroomOut):
     avg_score: float | None = None
     open_issue_count: int = 0
     total_issue_count: int = 0
+    septic_cycle_actual: int = Field(default=0, description="生效的清掏周期（天）")
+    latest_clean_date: date | None = None
+    next_clean_date: date | None = None
+    cleaning_count: int = 0

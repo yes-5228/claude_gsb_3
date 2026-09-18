@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 from app.schemas.inspection import InspectionOut
 from app.schemas.issue import IssueOut
+from app.schemas.septic import SepticOverview, SepticSchedule
 
 
 class NameValue(BaseModel):
@@ -69,3 +70,7 @@ class DashboardStats(BaseModel):
     top_restrooms: list[RestroomRankItem] = Field(default_factory=list)
     recent_issues: list[IssueOut] = Field(default_factory=list)
     recent_inspections: list[InspectionOut] = Field(default_factory=list)
+    septic_overview: SepticOverview | None = None
+    septic_alerts: list[SepticSchedule] = Field(
+        default_factory=list, description="超期与即将到期的清掏预警公厕"
+    )

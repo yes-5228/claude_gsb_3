@@ -1,6 +1,6 @@
-"""接口级测试：覆盖台账、巡查、问题整改与统计看板。"""
+"""接口级测试：覆盖台账、巡查、问题整改、清掏台账与统计看板。"""
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from tests.conftest import full_items
 
@@ -223,3 +223,166 @@ def test_dashboard_stats(client, restroom):
     }
     assert payload["top_restrooms"]
     assert "rectification_rate" in overview
+
+
+def test_septic_cleaning_crud(client, restroom):
+    # 公厕档案默认含池容、使用频次与推算周期
+    assert restroom["septic_capacity"] == 5.0
+    assert restroom["usage_frequency"] == "中频"
+
+    created = client.post(
+        "/api/v1/septic/cleanings",
+        json={
+            "restroom_id": restroom["id"],
+            "clean_date": "2026-09-01",
+            "contractor": "城维环保清掏服务有限公司",
+            "volume": 4.2,
+            "destination": "北郊污水处理厂污泥处置中心",
+            "vehicle_no": "鄂A·8T269",
+            "manifest_no": "LD-20260901-001",
+            "operator": "王师傅",
+            "remark": "例行清掏",
+        },
+    )
+    assert created.status_code == 201, created.text
+    record = created.json()
+    assert record["code"].startswith("HC-20260901-")
+    assert record["restroom"]["name"] == restroom["name"]
+
+    listed = client.get(
+        "/api/v1/septic/cleanings",
+        params={"keyword": "城维", "restroom_id": restroom["id"]},
+    ).json()
+    assert listed["meta"]["total"] == 1
+
+    updated = client.patch(
+        f"/api/v1/septic/cleanings/{record['id']}", json={"volume": 4.6, "operator": "李师傅"}
+    ).json()
+    assert updated["volume"] == 4.6
+    assert updated["operator"] == "李师傅"
+
+    detail = client.get(f"/api/v1/restrooms/{restroom['id']}").json()
+    assert detail["cleaning_count"] == 1
+    assert detail["latest_clean_date"] == "2026-09-01"
+    assert detail["next_clean_date"] == "2026-11-30"  # 5m³ × 18 / 1.0 = 90 天
+    assert detail["septic_cycle_actual"] == 90
+
+    removed = client.delete(f"/api/v1/septic/cleanings/{record['id']}")
+    assert removed.status_code == 200
+    assert client.get(f"/api/v1/septic/cleanings/{record['id']}").status_code == 404
+
+
+def test_septic_cycle_formula_and_manual_override(client):
+    # 高频 8m³：8 × 18 / 1.6 = 90 天
+    high = client.post(
+        "/api/v1/restrooms",
+        json={
+            "name": "高频公厕",
+            "district": "测试区",
+            "septic_capacity": 8.0,
+            "usage_frequency": "高频",
+        },
+    ).json()
+    # 低频 3m³：3 × 18 / 0.6 = 90 天
+    low = client.post(
+        "/api/v1/restrooms",
+        json={
+            "name": "低频公厕",
+            "district": "测试区",
+            "septic_capacity": 3.0,
+            "usage_frequency": "低频",
+        },
+    ).json()
+    # 极小池容也不低于 15 天
+    tiny = client.post(
+        "/api/v1/restrooms",
+        json={
+            "name": "微型公厕",
+            "district": "测试区",
+            "septic_capacity": 0.5,
+            "usage_frequency": "高频",
+        },
+    ).json()
+    assert client.get(f"/api/v1/restrooms/{high['id']}").json()["septic_cycle_actual"] == 90
+    assert client.get(f"/api/v1/restrooms/{low['id']}").json()["septic_cycle_actual"] == 90
+    assert client.get(f"/api/v1/restrooms/{tiny['id']}").json()["septic_cycle_actual"] == 15
+
+    # 人工设置周期优先于推算
+    patched = client.patch(f"/api/v1/restrooms/{high['id']}", json={"septic_cycle_days": 60}).json()
+    assert patched["septic_cycle_days"] == 60
+    assert client.get(f"/api/v1/restrooms/{high['id']}").json()["septic_cycle_actual"] == 60
+
+
+def test_septic_schedule_overdue_and_due_soon(client, restroom):
+    today = date.today()
+
+    def schedule_of(restroom_id):
+        rows = client.get("/api/v1/septic/schedules").json()
+        return next(item for item in rows if item["restroom"]["id"] == restroom_id)
+
+    # 从无记录 → 未建档
+    schedule = schedule_of(restroom["id"])
+    assert schedule["status"] == "未建档"
+    assert schedule["next_clean_date"] is None
+
+    # 100 天前清掏，周期 90 天 → 已超期
+    client.post(
+        "/api/v1/septic/cleanings",
+        json={
+            "restroom_id": restroom["id"],
+            "clean_date": (today - timedelta(days=100)).isoformat(),
+            "contractor": "绿源粪污清运有限公司",
+            "volume": 4.0,
+            "destination": "南郊有机废弃物处理站",
+        },
+    )
+    schedule = schedule_of(restroom["id"])
+    assert schedule["status"] == "已超期"
+    assert schedule["days_remaining"] == -10
+
+    overdue_ids = {
+        item["restroom"]["id"]
+        for item in client.get("/api/v1/septic/schedules", params={"overdue_only": "true"}).json()
+    }
+    assert restroom["id"] in overdue_ids
+
+    # 85 天前清掏 → 还剩 5 天，提前 7 天提醒 → 即将到期
+    client.post(
+        "/api/v1/septic/cleanings",
+        json={
+            "restroom_id": restroom["id"],
+            "clean_date": (today - timedelta(days=85)).isoformat(),
+            "contractor": "绿源粪污清运有限公司",
+            "volume": 4.0,
+            "destination": "南郊有机废弃物处理站",
+        },
+    )
+    schedule = schedule_of(restroom["id"])
+    assert schedule["status"] == "即将到期"
+    assert schedule["days_remaining"] == 5
+
+    overview = client.get("/api/v1/septic/overview").json()
+    assert overview["due_soon_count"] >= 1
+    assert overview["cleaning_total"] >= 2
+
+
+def test_septic_cleaning_delete_guard(client, restroom):
+    client.post(
+        "/api/v1/septic/cleanings",
+        json={
+            "restroom_id": restroom["id"],
+            "clean_date": "2026-08-01",
+            "contractor": "洁通管道清掏有限公司",
+            "volume": 3.5,
+            "destination": "城东粪污集中处理站",
+        },
+    )
+    blocked = client.delete(f"/api/v1/restrooms/{restroom['id']}")
+    assert blocked.status_code == 409
+    assert "清掏记录" in blocked.json()["detail"]
+
+    forced = client.delete(f"/api/v1/restrooms/{restroom['id']}", params={"force": "true"})
+    assert forced.status_code == 200
+    assert client.get("/api/v1/septic/cleanings", params={"restroom_id": restroom["id"]}).json()[
+        "meta"
+    ]["total"] == 0

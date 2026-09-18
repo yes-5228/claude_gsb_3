@@ -14,27 +14,49 @@ from app.core.constants import (
     RestroomGrade,
     RestroomStatus,
     Shift,
+    UsageFrequency,
 )
 from app.models import Restroom
 from app.schemas.inspection import InspectionCreate, InspectionItem
 from app.schemas.issue import IssueCreate, IssueStatusUpdate
 from app.schemas.restroom import RestroomCreate
-from app.services import inspection_service, issue_service, restroom_service
+from app.schemas.septic import SepticCleaningCreate
+from app.services import inspection_service, issue_service, restroom_service, septic_service
 
 RANDOM_SEED = 20240913
 
+# 名称, 区域, 地址, 等级, 状态, 责任人, 蹲位, 洗手盆, 无障碍, 化粪池容积(m³), 使用频次
 RESTROOM_SPECS = [
-    ("人民广场公共厕所", "城东区", "人民广场东侧 50 米", RestroomGrade.FIRST, RestroomStatus.NORMAL, "王秀兰", 12, 6, True),
-    ("滨江公园公共厕所", "城东区", "滨江公园 3 号入口", RestroomGrade.SECOND, RestroomStatus.NORMAL, "李国强", 8, 4, True),
-    ("和平路公共厕所", "城东区", "和平路与解放街交叉口", RestroomGrade.THIRD, RestroomStatus.MAINTENANCE, "赵敏", 4, 2, False),
-    ("火车站南广场公共厕所", "城西区", "火车站南广场西侧", RestroomGrade.FIRST, RestroomStatus.NORMAL, "陈志远", 16, 8, True),
-    ("西城集贸市场公共厕所", "城西区", "西城集贸市场北门", RestroomGrade.SECOND, RestroomStatus.NORMAL, "刘桂芳", 10, 4, False),
-    ("文化路步行街公共厕所", "城西区", "文化路步行街中段", RestroomGrade.SECOND, RestroomStatus.NORMAL, "孙鹏", 9, 5, True),
-    ("滨江新区体育中心公共厕所", "滨江新区", "体育中心东看台下", RestroomGrade.FIRST, RestroomStatus.NORMAL, "周晓燕", 14, 7, True),
-    ("滨江新区政务中心公共厕所", "滨江新区", "政务服务中心一楼", RestroomGrade.SECOND, RestroomStatus.NORMAL, "吴建华", 8, 4, True),
-    ("老城隍庙公共厕所", "老城区", "城隍庙街 12 号", RestroomGrade.THIRD, RestroomStatus.NORMAL, "郑淑珍", 5, 2, False),
-    ("老城区第三小学旁公共厕所", "老城区", "第三小学东侧巷道", RestroomGrade.THIRD, RestroomStatus.CLOSED, "何伟", 4, 2, False),
+    ("人民广场公共厕所", "城东区", "人民广场东侧 50 米", RestroomGrade.FIRST, RestroomStatus.NORMAL, "王秀兰", 12, 6, True, 16.0, UsageFrequency.HIGH),
+    ("滨江公园公共厕所", "城东区", "滨江公园 3 号入口", RestroomGrade.SECOND, RestroomStatus.NORMAL, "李国强", 8, 4, True, 8.0, UsageFrequency.MEDIUM),
+    ("和平路公共厕所", "城东区", "和平路与解放街交叉口", RestroomGrade.THIRD, RestroomStatus.MAINTENANCE, "赵敏", 4, 2, False, 4.0, UsageFrequency.LOW),
+    ("火车站南广场公共厕所", "城西区", "火车站南广场西侧", RestroomGrade.FIRST, RestroomStatus.NORMAL, "陈志远", 16, 8, True, 20.0, UsageFrequency.HIGH),
+    ("西城集贸市场公共厕所", "城西区", "西城集贸市场北门", RestroomGrade.SECOND, RestroomStatus.NORMAL, "刘桂芳", 10, 4, False, 9.0, UsageFrequency.HIGH),
+    ("文化路步行街公共厕所", "城西区", "文化路步行街中段", RestroomGrade.SECOND, RestroomStatus.NORMAL, "孙鹏", 9, 5, True, 8.0, UsageFrequency.HIGH),
+    ("滨江新区体育中心公共厕所", "滨江新区", "体育中心东看台下", RestroomGrade.FIRST, RestroomStatus.NORMAL, "周晓燕", 14, 7, True, 15.0, UsageFrequency.MEDIUM),
+    ("滨江新区政务中心公共厕所", "滨江新区", "政务服务中心一楼", RestroomGrade.SECOND, RestroomStatus.NORMAL, "吴建华", 8, 4, True, 7.0, UsageFrequency.LOW),
+    ("老城隍庙公共厕所", "老城区", "城隍庙街 12 号", RestroomGrade.THIRD, RestroomStatus.NORMAL, "郑淑珍", 5, 2, False, 5.0, UsageFrequency.MEDIUM),
+    ("老城区第三小学旁公共厕所", "老城区", "第三小学东侧巷道", RestroomGrade.THIRD, RestroomStatus.CLOSED, "何伟", 4, 2, False, 4.0, UsageFrequency.LOW),
 ]
+
+# 每座公厕最近一次清掏相对推算周期的状态，保证看板上各类预警都有样例
+SEPTIC_TARGETS = [
+    "overdue", "due_soon", "normal", "overdue", "normal",
+    "due_soon", "normal", "normal", "due_soon", "unknown",
+]
+
+SEPTIC_CONTRACTORS = [
+    "城维环保清掏服务有限公司",
+    "绿源粪污清运有限公司",
+    "市政环卫清运大队",
+    "洁通管道清掏有限公司",
+]
+SEPTIC_DESTINATIONS = [
+    "北郊污水处理厂污泥处置中心",
+    "南郊有机废弃物处理站",
+    "城东粪污集中处理站",
+]
+SEPTIC_VEHICLES = ["鄂A·8T269", "鄂A·5K803", "鄂A·3Q672", "鄂A·9F158", "鄂A·2D746"]
 
 INSPECTORS = ["张伟", "刘洋", "胡明月", "邓晨曦", "马晓峰", "杨柳"]
 MANAGERS = ["王秀兰", "李国强", "陈志远", "刘桂芳", "周晓燕", "吴建华", "郑淑珍", "孙鹏"]
@@ -120,10 +142,12 @@ def seed_database(db: Session, *, reset: bool = False) -> int:
                 stall_count=stalls,
                 basin_count=basins,
                 has_accessible=accessible,
+                septic_capacity=septic_capacity,
+                usage_frequency=usage_frequency,
                 open_hours="06:00-22:30" if grade == RestroomGrade.FIRST else "06:30-21:30",
             ),
         )
-        for name, district, address, grade, status, manager, stalls, basins, accessible in RESTROOM_SPECS
+        for name, district, address, grade, status, manager, stalls, basins, accessible, septic_capacity, usage_frequency in RESTROOM_SPECS
     ]
 
     quality_by_restroom = {room.id: rng.uniform(7.4, 9.8) for room in restrooms}
@@ -190,7 +214,51 @@ def seed_database(db: Session, *, reset: bool = False) -> int:
         created += 1
         _advance_issue(db, issue.id, age_days, rng)
 
+    _seed_cleanings(db, restrooms, now, rng)
     return created
+
+
+def _seed_cleanings(db: Session, restrooms: list, now: datetime, rng: random.Random) -> None:
+    """为每座公厕生成 1-3 条历史清掏记录，覆盖超期/即将到期/正常/未建档四种状态。"""
+    for index, room in enumerate(restrooms):
+        target = SEPTIC_TARGETS[index] if index < len(SEPTIC_TARGETS) else "normal"
+        cycle = septic_service.calc_cycle_days(room)
+
+        if target == "unknown":
+            continue  # 保留为「未建档」，不生成任何记录
+
+        if target == "overdue":
+            last_age = cycle + rng.randint(5, 25)
+        elif target == "due_soon":
+            last_age = max(1, cycle - rng.randint(1, 5))
+        else:
+            # 一部分公厕本月刚清掏过，保证本月台账有数据
+            last_age = (
+                rng.randint(1, 12)
+                if rng.random() < 0.45
+                else rng.randint(15, max(16, cycle // 2))
+            )
+
+        history_count = 1 + rng.randint(0, 2)
+        age = last_age
+        for order in range(history_count):
+            clean_date = (now - timedelta(days=age)).date()
+            volume = round(room.septic_capacity * rng.uniform(0.7, 0.95), 1)
+            septic_service.create_cleaning(
+                db,
+                SepticCleaningCreate(
+                    restroom_id=room.id,
+                    clean_date=clean_date,
+                    contractor=rng.choice(SEPTIC_CONTRACTORS),
+                    volume=volume,
+                    destination=rng.choice(SEPTIC_DESTINATIONS),
+                    vehicle_no=rng.choice(SEPTIC_VEHICLES),
+                    manifest_no=f"LD-{clean_date.strftime('%Y%m%d')}-{rng.randint(100, 999)}",
+                    operator=rng.choice(MANAGERS),
+                    remark="例行清掏，外运联单已留存" if order == 0 else None,
+                ),
+            )
+            age += cycle + rng.randint(-5, 5)
 
 
 def _advance_issue(db: Session, issue_id: int, age_days: int, rng: random.Random) -> None:
