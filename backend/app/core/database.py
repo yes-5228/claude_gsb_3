@@ -52,7 +52,27 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
+def _ensure_columns() -> None:
+    """轻量迁移：为已有的 SQLite 数据库补充后续版本新增的列。"""
+    if engine.url.get_backend_name() != "sqlite":
+        return
+    with engine.begin() as conn:
+        rows = conn.exec_driver_sql("PRAGMA table_info(restrooms)").all()
+        if not rows:
+            return
+        existing = {row[1] for row in rows}
+        if "tank_capacity" not in existing:
+            conn.exec_driver_sql(
+                "ALTER TABLE restrooms ADD COLUMN tank_capacity FLOAT NOT NULL DEFAULT 0"
+            )
+        if "usage_frequency" not in existing:
+            conn.exec_driver_sql(
+                "ALTER TABLE restrooms ADD COLUMN usage_frequency INTEGER NOT NULL DEFAULT 0"
+            )
+
+
 def init_db() -> None:
     from app import models  # noqa: F401  确保模型完成注册
 
     Base.metadata.create_all(bind=engine)
+    _ensure_columns()

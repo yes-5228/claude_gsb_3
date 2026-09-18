@@ -49,6 +49,15 @@ class IssueStatus(StrEnum):
     CLOSED = "已关闭"
 
 
+class CleaningStatus(StrEnum):
+    """公厕化粪池清掏的到期状态。"""
+
+    UNSET = "未设置"
+    NORMAL = "正常"
+    DUE_SOON = "临期"
+    OVERDUE = "已超期"
+
+
 # 整改流转规则：当前状态 -> 允许流转到的状态
 ISSUE_TRANSITIONS: dict[str, list[str]] = {
     IssueStatus.PENDING: [IssueStatus.PROCESSING, IssueStatus.CLOSED],
@@ -97,3 +106,10 @@ OPEN_ISSUE_STATUSES: list[str] = [
 
 # 单检查项低于该分数视为不合格项
 INSPECTION_ITEM_PROBLEM_THRESHOLD = 6
+
+# 化粪池清掏周期推算参数
+TANK_USABLE_RATIO = 0.8  # 有效池容占比，积存量达到池容 80% 即应清掏
+SEWAGE_PER_USE = 0.0004  # 单次使用积存量（立方米/人次），约 0.4 升
+CLEAN_CYCLE_MIN_DAYS = 7  # 清掏周期下限（天）
+CLEAN_CYCLE_MAX_DAYS = 180  # 清掏周期上限（天），最长不超过半年
+CLEAN_REMIND_DAYS = 7  # 距应清日期多少天内视为临期，提前提醒

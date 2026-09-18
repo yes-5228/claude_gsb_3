@@ -30,6 +30,8 @@ class Restroom(Base):
     open_hours: Mapped[str] = mapped_column(String(60), default="06:00-22:00", comment="开放时间")
     stall_count: Mapped[int] = mapped_column(Integer, default=0, comment="蹲位数量")
     basin_count: Mapped[int] = mapped_column(Integer, default=0, comment="洗手盆数量")
+    tank_capacity: Mapped[float] = mapped_column(Float, default=0.0, comment="化粪池容积（立方米）")
+    usage_frequency: Mapped[int] = mapped_column(Integer, default=0, comment="日均使用频次（人次）")
     has_accessible: Mapped[bool] = mapped_column(Boolean, default=True, comment="是否有无障碍设施")
     longitude: Mapped[float | None] = mapped_column(Float, nullable=True, comment="经度")
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True, comment="纬度")
@@ -43,5 +45,8 @@ class Restroom(Base):
         back_populates="restroom", cascade="all, delete-orphan"
     )
     issues: Mapped[list["Issue"]] = relationship(  # noqa: F821
+        back_populates="restroom", cascade="all, delete-orphan"
+    )
+    cleanings: Mapped[list["CleaningRecord"]] = relationship(  # noqa: F821
         back_populates="restroom", cascade="all, delete-orphan"
     )

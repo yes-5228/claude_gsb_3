@@ -17,6 +17,8 @@ const EMPTY = {
   open_hours: '06:00-22:00',
   stall_count: 0,
   basin_count: 0,
+  tank_capacity: 0,
+  usage_frequency: 0,
   has_accessible: true,
   remark: '',
 };
@@ -129,6 +131,23 @@ export default function RestroomFormModal({ restroom, onClose, onSaved }) {
         </Field>
         <Field label="洗手盆数量">
           <input type="number" min="0" value={form.basin_count} onChange={setValue('basin_count')} />
+        </Field>
+        <Field label="化粪池容积（m³）" hint="用于推算清掏周期">
+          <input
+            type="number"
+            min="0"
+            step="0.5"
+            value={form.tank_capacity}
+            onChange={setValue('tank_capacity')}
+          />
+        </Field>
+        <Field label="日均使用频次（人次）" hint="与池容共同决定清掏周期">
+          <input
+            type="number"
+            min="0"
+            value={form.usage_frequency}
+            onChange={setValue('usage_frequency')}
+          />
         </Field>
         <Field label="无障碍设施" full>
           <label className="checkbox-row">

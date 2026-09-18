@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import BarList from '../../components/BarList.jsx';
 import DataTable from '../../components/DataTable.jsx';
 import { ScorePill, SeverityTag, StatusTag } from '../../components/Tags.jsx';
-import { formatDateTime } from '../../utils/format.js';
+import { formatDate, formatDateTime } from '../../utils/format.js';
 
 const STATUS_COLORS = {
   待整改: '#dc2626',
@@ -144,6 +144,49 @@ export function RecentIssuesPanel({ items }) {
         ]}
         rows={items || []}
         emptyText="暂无问题"
+      />
+    </section>
+  );
+}
+
+export function CleaningReminderPanel({ items }) {
+  return (
+    <section className="card">
+      <div className="card-title">
+        <h3>化粪池清掏提醒</h3>
+        <Link className="hint" to="/cleanings">
+          前往清掏台账 →
+        </Link>
+      </div>
+      <DataTable
+        columns={[
+          {
+            key: 'name',
+            title: '公厕',
+            render: (row) => <Link to={`/restrooms/${row.restroom_id}`}>{row.name}</Link>,
+          },
+          { key: 'district', title: '区域' },
+          {
+            key: 'cycle_days',
+            title: '清掏周期',
+            render: (row) => (row.cycle_days != null ? `${row.cycle_days} 天` : '-'),
+          },
+          {
+            key: 'next_due_time',
+            title: '应清日期',
+            render: (row) => (row.next_due_time ? formatDate(row.next_due_time) : '-'),
+          },
+          {
+            key: 'days_remaining',
+            title: '剩余/超期',
+            render: (row) =>
+              row.days_remaining < 0 ? `超期 ${-row.days_remaining} 天` : `剩余 ${row.days_remaining} 天`,
+          },
+          { key: 'status', title: '状态', render: (row) => <StatusTag status={row.status} /> },
+        ]}
+        rows={items || []}
+        rowKey={(row) => row.restroom_id}
+        emptyText="暂无超期或临期的公厕"
       />
     </section>
   );

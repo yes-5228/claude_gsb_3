@@ -7,6 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.constants import (
+    CLEAN_REMIND_DAYS,
     INSPECTION_CHECK_ITEMS,
     IssueCategory,
     IssueSeverity,
@@ -16,28 +17,32 @@ from app.core.constants import (
     Shift,
 )
 from app.models import Restroom
+from app.schemas.cleaning import CleaningCreate
 from app.schemas.inspection import InspectionCreate, InspectionItem
 from app.schemas.issue import IssueCreate, IssueStatusUpdate
 from app.schemas.restroom import RestroomCreate
-from app.services import inspection_service, issue_service, restroom_service
+from app.services import cleaning_service, inspection_service, issue_service, restroom_service
 
 RANDOM_SEED = 20240913
 
 RESTROOM_SPECS = [
-    ("人民广场公共厕所", "城东区", "人民广场东侧 50 米", RestroomGrade.FIRST, RestroomStatus.NORMAL, "王秀兰", 12, 6, True),
-    ("滨江公园公共厕所", "城东区", "滨江公园 3 号入口", RestroomGrade.SECOND, RestroomStatus.NORMAL, "李国强", 8, 4, True),
-    ("和平路公共厕所", "城东区", "和平路与解放街交叉口", RestroomGrade.THIRD, RestroomStatus.MAINTENANCE, "赵敏", 4, 2, False),
-    ("火车站南广场公共厕所", "城西区", "火车站南广场西侧", RestroomGrade.FIRST, RestroomStatus.NORMAL, "陈志远", 16, 8, True),
-    ("西城集贸市场公共厕所", "城西区", "西城集贸市场北门", RestroomGrade.SECOND, RestroomStatus.NORMAL, "刘桂芳", 10, 4, False),
-    ("文化路步行街公共厕所", "城西区", "文化路步行街中段", RestroomGrade.SECOND, RestroomStatus.NORMAL, "孙鹏", 9, 5, True),
-    ("滨江新区体育中心公共厕所", "滨江新区", "体育中心东看台下", RestroomGrade.FIRST, RestroomStatus.NORMAL, "周晓燕", 14, 7, True),
-    ("滨江新区政务中心公共厕所", "滨江新区", "政务服务中心一楼", RestroomGrade.SECOND, RestroomStatus.NORMAL, "吴建华", 8, 4, True),
-    ("老城隍庙公共厕所", "老城区", "城隍庙街 12 号", RestroomGrade.THIRD, RestroomStatus.NORMAL, "郑淑珍", 5, 2, False),
-    ("老城区第三小学旁公共厕所", "老城区", "第三小学东侧巷道", RestroomGrade.THIRD, RestroomStatus.CLOSED, "何伟", 4, 2, False),
+    ("人民广场公共厕所", "城东区", "人民广场东侧 50 米", RestroomGrade.FIRST, RestroomStatus.NORMAL, "王秀兰", 12, 6, True, 20.0, 1500),
+    ("滨江公园公共厕所", "城东区", "滨江公园 3 号入口", RestroomGrade.SECOND, RestroomStatus.NORMAL, "李国强", 8, 4, True, 12.0, 800),
+    ("和平路公共厕所", "城东区", "和平路与解放街交叉口", RestroomGrade.THIRD, RestroomStatus.MAINTENANCE, "赵敏", 4, 2, False, 8.0, 300),
+    ("火车站南广场公共厕所", "城西区", "火车站南广场西侧", RestroomGrade.FIRST, RestroomStatus.NORMAL, "陈志远", 16, 8, True, 25.0, 2500),
+    ("西城集贸市场公共厕所", "城西区", "西城集贸市场北门", RestroomGrade.SECOND, RestroomStatus.NORMAL, "刘桂芳", 10, 4, False, 15.0, 900),
+    ("文化路步行街公共厕所", "城西区", "文化路步行街中段", RestroomGrade.SECOND, RestroomStatus.NORMAL, "孙鹏", 9, 5, True, 15.0, 1100),
+    ("滨江新区体育中心公共厕所", "滨江新区", "体育中心东看台下", RestroomGrade.FIRST, RestroomStatus.NORMAL, "周晓燕", 14, 7, True, 22.0, 1300),
+    ("滨江新区政务中心公共厕所", "滨江新区", "政务服务中心一楼", RestroomGrade.SECOND, RestroomStatus.NORMAL, "吴建华", 8, 4, True, 12.0, 600),
+    ("老城隍庙公共厕所", "老城区", "城隍庙街 12 号", RestroomGrade.THIRD, RestroomStatus.NORMAL, "郑淑珍", 5, 2, False, 8.0, 350),
+    ("老城区第三小学旁公共厕所", "老城区", "第三小学东侧巷道", RestroomGrade.THIRD, RestroomStatus.CLOSED, "何伟", 4, 2, False, 6.0, 200),
 ]
 
 INSPECTORS = ["张伟", "刘洋", "胡明月", "邓晨曦", "马晓峰", "杨柳"]
 MANAGERS = ["王秀兰", "李国强", "陈志远", "刘桂芳", "周晓燕", "吴建华", "郑淑珍", "孙鹏"]
+
+CLEANING_UNITS = ["城环清掏服务队", "市政设施养护中心", "洁源环保工程有限公司"]
+CLEANING_DESTINATIONS = ["市第一污水处理厂", "城东污泥消纳场", "滨江污水处理厂"]
 
 ISSUE_TEMPLATES = {
     IssueCategory.CLEANING: [
@@ -120,11 +125,15 @@ def seed_database(db: Session, *, reset: bool = False) -> int:
                 stall_count=stalls,
                 basin_count=basins,
                 has_accessible=accessible,
+                tank_capacity=tank_capacity,
+                usage_frequency=usage_frequency,
                 open_hours="06:00-22:30" if grade == RestroomGrade.FIRST else "06:30-21:30",
             ),
         )
-        for name, district, address, grade, status, manager, stalls, basins, accessible in RESTROOM_SPECS
+        for name, district, address, grade, status, manager, stalls, basins, accessible, tank_capacity, usage_frequency in RESTROOM_SPECS
     ]
+
+    _seed_cleanings(db, restrooms, rng, now)
 
     quality_by_restroom = {room.id: rng.uniform(7.4, 9.8) for room in restrooms}
     inspection_ids: list[tuple[int, int]] = []  # (restroom_id, inspection_id)
@@ -191,6 +200,43 @@ def seed_database(db: Session, *, reset: bool = False) -> int:
         _advance_issue(db, issue.id, age_days, rng)
 
     return created
+
+
+def _seed_cleanings(
+    db: Session, restrooms: list[Restroom], rng: random.Random, now: datetime
+) -> None:
+    """生成历史清掏记录：刻意让部分公厕超期、部分临期，便于演示提醒与超期清单。"""
+    overdue_ids = {restrooms[0].id, restrooms[3].id}
+    due_soon_ids = {restrooms[1].id, restrooms[4].id}
+
+    for room in restrooms:
+        cycle = cleaning_service.compute_cycle_days(room.tank_capacity, room.usage_frequency)
+        if cycle is None:
+            continue
+        if room.id in overdue_ids:
+            last_offset = cycle + rng.randint(4, 12)  # 已超过应清日期
+        elif room.id in due_soon_ids:
+            last_offset = cycle - rng.randint(1, CLEAN_REMIND_DAYS - 2)  # 临近应清日期
+        else:
+            last_offset = rng.randint(1, max(1, cycle - CLEAN_REMIND_DAYS - 2))
+
+        # 每座公厕补 2~3 条历史记录，间隔约一个清掏周期
+        offsets = sorted(
+            [last_offset + cycle * step + rng.randint(-3, 3) for step in (2, 1)] + [last_offset]
+        )
+        for offset in offsets:
+            clean_time = now - timedelta(days=offset)
+            cleaning_service.create_cleaning(
+                db,
+                CleaningCreate(
+                    restroom_id=room.id,
+                    clean_time=clean_time.replace(hour=rng.choice([6, 9, 14, 16]), minute=30),
+                    operator_unit=rng.choice(CLEANING_UNITS),
+                    volume=round(room.tank_capacity * rng.uniform(0.7, 0.95), 1),
+                    destination=rng.choice(CLEANING_DESTINATIONS),
+                    remark=None,
+                ),
+            )
 
 
 def _advance_issue(db: Session, issue_id: int, age_days: int, rng: random.Random) -> None:

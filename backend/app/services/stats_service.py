@@ -22,7 +22,7 @@ from app.schemas.stats import (
     RestroomRankItem,
     TrendPoint,
 )
-from app.services import inspection_service, issue_service
+from app.services import cleaning_service, inspection_service, issue_service
 
 
 def _count(db: Session, model, *conditions) -> int:
@@ -50,6 +50,7 @@ def overview(db: Session) -> OverviewStats:
     done_count = _count(db, Issue, Issue.status == IssueStatus.DONE.value)
     closed_count = _count(db, Issue, Issue.status == IssueStatus.CLOSED.value)
     finished = done_count + closed_count
+    cleaning_overdue, cleaning_due_soon, _ = cleaning_service.reminder_summary(db)
 
     return OverviewStats(
         restroom_total=_count(db, Restroom),
@@ -74,6 +75,8 @@ def overview(db: Session) -> OverviewStats:
             db, Issue, Issue.status == IssueStatus.DONE.value, Issue.updated_at >= month_start
         ),
         rectification_rate=round(finished / issue_total * 100, 1) if issue_total else 0.0,
+        cleaning_overdue=cleaning_overdue,
+        cleaning_due_soon=cleaning_due_soon,
     )
 
 
@@ -232,6 +235,7 @@ def dashboard(db: Session, trend_days: int = 14) -> DashboardStats:
     recent_inspections, _ = inspection_service.list_inspections(
         db, page=1, page_size=5, sort_by="inspect_time"
     )
+    _, _, cleaning_reminders = cleaning_service.reminder_summary(db)
     return DashboardStats(
         overview=overview(db),
         issue_by_status=issue_by_status(db),
@@ -242,4 +246,5 @@ def dashboard(db: Session, trend_days: int = 14) -> DashboardStats:
         top_restrooms=restroom_ranking(db),
         recent_issues=[issue_service.to_out(issue) for issue in recent_issues],
         recent_inspections=[inspection_service.to_out(item) for item in recent_inspections],
+        cleaning_reminders=cleaning_reminders,
     )

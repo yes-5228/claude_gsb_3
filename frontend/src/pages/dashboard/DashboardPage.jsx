@@ -8,6 +8,7 @@ import TrendChart from '../../components/TrendChart.jsx';
 import { useAsync } from '../../hooks/useAsync.js';
 import {
   CategoryPanel,
+  CleaningReminderPanel,
   DistrictPanel,
   IssueStatusPanel,
   RankingPanel,
@@ -86,6 +87,13 @@ export default function DashboardPage() {
                 foot="超过整改期限仍未闭环"
               />
               <StatCard
+                label="超期未清掏"
+                value={overview.cleaning_overdue}
+                unit="座"
+                tone={overview.cleaning_overdue > 0 ? 'danger' : 'primary'}
+                foot={`临期 ${overview.cleaning_due_soon} 座 · 化粪池清掏`}
+              />
+              <StatCard
                 label="整改闭环率"
                 value={overview.rectification_rate.toFixed(1)}
                 unit="%"
@@ -130,6 +138,8 @@ export default function DashboardPage() {
               <RecentIssuesPanel items={data.recent_issues} />
               <RecentInspectionsPanel items={data.recent_inspections} />
             </div>
+
+            <CleaningReminderPanel items={data.cleaning_reminders} />
           </>
         ) : null}
       </div>

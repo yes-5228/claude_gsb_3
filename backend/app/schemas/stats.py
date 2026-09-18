@@ -2,6 +2,7 @@
 
 from pydantic import BaseModel, Field
 
+from app.schemas.cleaning import CleaningScheduleItem
 from app.schemas.inspection import InspectionOut
 from app.schemas.issue import IssueOut
 
@@ -24,6 +25,8 @@ class OverviewStats(BaseModel):
     issue_overdue: int = 0
     issue_done_this_month: int = 0
     rectification_rate: float = Field(default=0.0, description="整改完成率（百分比）")
+    cleaning_overdue: int = Field(default=0, description="超期未清掏公厕数")
+    cleaning_due_soon: int = Field(default=0, description="临期待清掏公厕数")
 
 
 class TrendPoint(BaseModel):
@@ -69,3 +72,4 @@ class DashboardStats(BaseModel):
     top_restrooms: list[RestroomRankItem] = Field(default_factory=list)
     recent_issues: list[IssueOut] = Field(default_factory=list)
     recent_inspections: list[InspectionOut] = Field(default_factory=list)
+    cleaning_reminders: list[CleaningScheduleItem] = Field(default_factory=list)

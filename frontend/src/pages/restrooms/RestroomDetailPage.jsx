@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
+import { cleaningApi } from '../../api/cleanings.js';
 import { inspectionApi } from '../../api/inspections.js';
 import { issueApi } from '../../api/issues.js';
 import { restroomApi } from '../../api/restrooms.js';
@@ -11,12 +12,13 @@ import Pagination from '../../components/Pagination.jsx';
 import { ScorePill, SeverityTag, StatusTag } from '../../components/Tags.jsx';
 import { useAsync } from '../../hooks/useAsync.js';
 import { useListQuery } from '../../hooks/useListQuery.js';
-import { formatDateTime } from '../../utils/format.js';
+import { formatDate, formatDateTime } from '../../utils/format.js';
 import RestroomFormModal from './RestroomFormModal.jsx';
 
 const TABS = [
   { key: 'profile', label: '基础档案' },
   { key: 'inspections', label: '巡查记录' },
+  { key: 'cleanings', label: '清掏记录' },
   { key: 'issues', label: '问题记录' },
 ];
 
@@ -39,6 +41,16 @@ export default function RestroomDetailPage() {
     {},
     5,
   );
+  const cleanings = useListQuery(
+    (params) => cleaningApi.list({ ...params, restroom_id: restroomId }),
+    {},
+    5,
+  );
+  const { data: cleaningSchedule } = useAsync(
+    () => cleaningApi.schedule({ restroom_id: restroomId }),
+    [restroomId],
+  );
+  const cleaningPlan = cleaningSchedule?.[0] ?? null;
 
   return (
     <>
@@ -124,6 +136,8 @@ export default function RestroomDetailPage() {
                     { label: '联系电话', value: restroom.manager_phone },
                     { label: '蹲位数量', value: `${restroom.stall_count} 个` },
                     { label: '洗手盆数量', value: `${restroom.basin_count} 个` },
+                    { label: '化粪池容积', value: restroom.tank_capacity ? `${restroom.tank_capacity} m³` : '未设置' },
+                    { label: '日均使用频次', value: restroom.usage_frequency ? `${restroom.usage_frequency} 人次/日` : '未设置' },
                     { label: '无障碍设施', value: restroom.has_accessible ? '已配置' : '未配置' },
                     { label: '备注', value: restroom.remark || '无' },
                     { label: '建档时间', value: formatDateTime(restroom.created_at) },
@@ -155,6 +169,74 @@ export default function RestroomDetailPage() {
                   ]}
                 />
                 <Pagination meta={inspections.meta} onPageChange={inspections.setPage} />
+              </section>
+            ) : null}
+
+            {tab === 'cleanings' ? (
+              <section className="card">
+                <div className="card-title">
+                  <h3>清掏记录</h3>
+                  <Link className="hint" to="/cleanings">
+                    前往清掏台账 →
+                  </Link>
+                </div>
+                {cleaningPlan ? (
+                  <div className="stat-grid" style={{ marginBottom: 12 }}>
+                    <div className="stat-card">
+                      <div className="label">推算清掏周期</div>
+                      <div className="value">
+                        {cleaningPlan.cycle_days != null ? cleaningPlan.cycle_days : '-'}
+                        <span className="unit">天</span>
+                      </div>
+                      <div className="foot">
+                        池容 {cleaningPlan.tank_capacity} m³ · {cleaningPlan.usage_frequency} 人次/日
+                      </div>
+                    </div>
+                    <div className="stat-card is-info">
+                      <div className="label">上次清掏</div>
+                      <div className="value" style={{ fontSize: 18 }}>
+                        {cleaningPlan.last_clean_time ? formatDate(cleaningPlan.last_clean_time) : '从未清掏'}
+                      </div>
+                      <div className="foot">累计清掏 {cleaningPlan.clean_count} 次</div>
+                    </div>
+                    <div
+                      className={`stat-card${
+                        cleaningPlan.status === '已超期'
+                          ? ' is-danger'
+                          : cleaningPlan.status === '临期'
+                            ? ' is-warning'
+                            : ''
+                      }`}
+                    >
+                      <div className="label">下次应清</div>
+                      <div className="value" style={{ fontSize: 18 }}>
+                        {cleaningPlan.next_due_time ? formatDate(cleaningPlan.next_due_time) : '-'}
+                      </div>
+                      <div className="foot">
+                        <StatusTag status={cleaningPlan.status} />
+                        {cleaningPlan.days_remaining != null
+                          ? cleaningPlan.days_remaining < 0
+                            ? ` 已超期 ${-cleaningPlan.days_remaining} 天`
+                            : ` 剩余 ${cleaningPlan.days_remaining} 天`
+                          : ''}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+                <DataTable
+                  loading={cleanings.loading}
+                  error={cleanings.error}
+                  rows={cleanings.items}
+                  emptyText="该公厕暂无清掏记录"
+                  columns={[
+                    { key: 'clean_time', title: '清掏时间', render: (row) => formatDateTime(row.clean_time) },
+                    { key: 'operator_unit', title: '作业单位' },
+                    { key: 'volume', title: '清掏量', render: (row) => `${row.volume} m³` },
+                    { key: 'destination', title: '外运去向', wrap: true },
+                    { key: 'remark', title: '备注', wrap: true, render: (row) => row.remark || '-' },
+                  ]}
+                />
+                <Pagination meta={cleanings.meta} onPageChange={cleanings.setPage} />
               </section>
             ) : null}
 

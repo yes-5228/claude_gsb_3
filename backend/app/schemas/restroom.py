@@ -30,6 +30,8 @@ class RestroomBase(BaseModel):
     open_hours: str = Field(default="06:00-22:00", max_length=60, description="开放时间")
     stall_count: int = Field(default=0, ge=0, description="蹲位数量")
     basin_count: int = Field(default=0, ge=0, description="洗手盆数量")
+    tank_capacity: float = Field(default=0.0, ge=0, description="化粪池容积（立方米）")
+    usage_frequency: int = Field(default=0, ge=0, description="日均使用频次（人次）")
     has_accessible: bool = Field(default=True, description="是否有无障碍设施")
     longitude: float | None = Field(default=None, description="经度")
     latitude: float | None = Field(default=None, description="纬度")
@@ -53,6 +55,8 @@ class RestroomUpdate(BaseModel):
     open_hours: str | None = Field(default=None, max_length=60)
     stall_count: int | None = Field(default=None, ge=0)
     basin_count: int | None = Field(default=None, ge=0)
+    tank_capacity: float | None = Field(default=None, ge=0)
+    usage_frequency: int | None = Field(default=None, ge=0)
     has_accessible: bool | None = None
     longitude: float | None = None
     latitude: float | None = None
